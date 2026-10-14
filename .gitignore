@@ -1,0 +1,12 @@
+# Secrets
+.env
+.env.*
+
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Alembic
+# Keep migration files tracked
