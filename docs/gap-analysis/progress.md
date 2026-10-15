@@ -1,10 +1,12 @@
+All work follows `00-project-context.md`.
+
 # Progress
 
 This file is a lightweight checklist for the gap-analysis backlog. Mark items as complete as work proceeds.
 
 ## Pre-work (planning docs)
 - [x] Decisions D1-D6 applied to docs 03, 04, 05, 06
-- [ ] Pre-work reviewed by owner
+- [x] Pre-work reviewed by owner
 
 ## Phase 0 — Foundations
 - [ ] BE-01 — Establish runtime config and API contract basics

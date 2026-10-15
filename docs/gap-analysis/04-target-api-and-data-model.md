@@ -2,6 +2,12 @@
 
 This section proposes the backend contract the frontend prototype needs, without implementing it.
 
+## Testing policy (enforced)
+
+1. Unit and contract tests: mocked DB sessions or dependency overrides. They run with no network and no `DATABASE_URL`. This is the default `pytest -q`.
+2. Integration tests: marked `@pytest.mark.integration`, excluded by default (`addopts = -m "not integration"`). They run only with `pytest -m integration`, and require an explicit `TEST_DATABASE_SCHEMA` (default `test`). They create that schema, run migrations/DDL inside it, and wrap each test in a transaction that is rolled back. They must refuse to run if the target schema is `public`.
+3. Tests never write to `public` and never print connection details.
+
 ## 1) Target endpoint list and status
 
 | Endpoint | Method | Status | Notes |
@@ -469,6 +475,8 @@ Recommended order:
 5. Add `knowledge_documents` and `knowledge_chunks`.
 6. Add `ai_conversations`, `ai_messages`, and `ai_message_citations`.
 7. Add `user_settings` and any future profile hooks.
+
+Migration guardrails: each migration is previewed with `alembic upgrade head --sql` and applied only after explicit owner approval; all new tables use `ENABLE ROW LEVEL SECURITY`, no policies, and `server_default=gen_random_uuid()` on UUID PKs. No secrets are printed in logs.
 
 This keeps the current `assessments` table intact for earlier data while allowing a richer product model with additive schema changes only.
 

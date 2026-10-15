@@ -156,7 +156,7 @@ Important logic detail: `annual_net_benefit` is calculated as `monthly_net_savin
 - `SessionLocal` is configured in `app/database.py:18-26`.
 - `get_db()` yields a session and closes it in a `finally` block (`app/database.py:34-40`).
 - There is no Supabase client or direct Supabase access in the codebase.
-- The tests explicitly say “never contact live Supabase” in `tests/test_api.py:17-20`, which suggests the project originally considered Supabase but the current code path is entirely SQLAlchemy + PostgreSQL + local `.env` configuration.
+- The default test path is mocked DB/session-based coverage rather than a live project connection; the project’s managed Postgres configuration is treated as a Supabase-backed environment, and the test policy keeps writes and integration checks inside a dedicated test schema without touching `public`.
 - `alembic/env.py:18-25` reads `DATABASE_URL` and configures Alembic to use it.
 - `alembic/versions/aa8bd5c84595_create_assessment_history_tables.py:21-52` creates the two tables created by the app.
 
