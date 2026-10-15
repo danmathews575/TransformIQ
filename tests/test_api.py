@@ -1,3 +1,5 @@
+"""Tests for API endpoints with mocked database."""
+
 from datetime import datetime, timezone
 from unittest.mock import MagicMock
 from uuid import uuid4
@@ -140,7 +142,10 @@ def test_get_assessment_not_found(db_session):
     )
 
     assert response.status_code == 404
-    assert response.json()["detail"] == "Assessment not found"
+    body = response.json()
+    assert body["code"] == "not_found"
+    assert "message" in body
+    assert "request_id" in body
 
 
 def test_database_failure_returns_500(
@@ -155,13 +160,14 @@ def test_database_failure_returns_500(
     )
 
     assert response.status_code == 500
-    assert response.json()["detail"] == (
-        "Unable to save assessment. Please try again."
-    )
+    body = response.json()
+    assert body["code"] == "database_error"
+    assert "message" in body
+    assert "request_id" in body
     db_session.rollback.assert_called_once()
 
 
-def test_invalid_automation_rate(assessment_payload):
+def test_invalid_automation_rate(db_session, assessment_payload):
     assessment_payload["automation_rate"] = 1.5
 
     response = client.post(
@@ -170,9 +176,12 @@ def test_invalid_automation_rate(assessment_payload):
     )
 
     assert response.status_code == 422
+    body = response.json()
+    assert body["code"] == "validation_error"
+    assert "field_errors" in body["details"]
 
 
-def test_negative_monthly_queries(assessment_payload):
+def test_negative_monthly_queries(db_session, assessment_payload):
     assessment_payload["monthly_queries"] = -100
 
     response = client.post(
@@ -181,3 +190,6 @@ def test_negative_monthly_queries(assessment_payload):
     )
 
     assert response.status_code == 422
+    body = response.json()
+    assert body["code"] == "validation_error"
+    assert "field_errors" in body["details"]

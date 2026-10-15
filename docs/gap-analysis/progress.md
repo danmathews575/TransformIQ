@@ -9,7 +9,7 @@ This file is a lightweight checklist for the gap-analysis backlog. Mark items as
 - [x] Pre-work reviewed by owner
 
 ## Phase 0 — Foundations
-- [ ] BE-01 — Establish runtime config and API contract basics
+- [x] BE-01 — Establish runtime config and API contract basics
 - [ ] BE-02 — Add database connection, migrations, and demo seed data
 
 ## Phase 1 — Assessment workflow and wizard data

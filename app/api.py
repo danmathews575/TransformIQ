@@ -1,23 +1,74 @@
 """TransformIQ: REST API for business assessments and history."""
 
-from uuid import UUID
+import logging
+import uuid
+from typing import Any, Dict
 
-from fastapi import Depends, FastAPI, HTTPException, Query
+from fastapi import Depends, FastAPI, HTTPException, Query, Request
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, selectinload
 
-from app.database import get_db
+from app.config import get_settings
+from app.database import DatabaseUnavailableError, check_database_connection, get_db
+from app.errors import register_exception_handlers
 from app.models import Assessment, OpportunityRanking
 from app.roi_engine import calculate_roi
 from app.opportunity_engine import assess_ecommerce_opportunities
 
+settings = get_settings()
+
 app = FastAPI(
     title="TransformIQ API",
     description="AI opportunity prioritization and ROI assessment.",
-    version="0.3.0",
+    version=settings.app_version,
 )
+
+# CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.cors_origins_list,
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+    expose_headers=["X-Request-ID"],
+)
+
+# Register exception handlers
+register_exception_handlers(app)
+
+# Request ID middleware and logging
+@app.middleware("http")
+async def add_request_id_and_logging(request: Request, call_next):
+    """Add request ID to request state and response headers, log request/response."""
+    request_id = request.headers.get("X-Request-ID") or str(uuid.uuid4())
+    request.state.request_id = request_id
+
+    # Log request
+    logging.info(
+        "Request: method=%s path=%s request_id=%s",
+        request.method,
+        request.url.path,
+        request_id,
+    )
+
+    response = await call_next(request)
+
+    # Add request ID to response headers
+    response.headers["X-Request-ID"] = request_id
+
+    # Log response
+    logging.info(
+        "Response: method=%s path=%s status=%s request_id=%s",
+        request.method,
+        request.url.path,
+        response.status_code,
+        request_id,
+    )
+
+    return response
 
 
 class BusinessAssessment(BaseModel):
@@ -34,13 +85,22 @@ def root():
     return {
         "name": "TransformIQ",
         "status": "running",
-        "version": "0.3.0",
+        "version": settings.app_version,
     }
 
 
 @app.get("/health")
 def health():
     return {"status": "healthy"}
+
+
+@app.get("/health/db")
+def health_db():
+    """Check database connectivity."""
+    if check_database_connection():
+        return {"status": "healthy"}
+    else:
+        raise DatabaseUnavailableError("Database connection failed")
 
 
 @app.post(
@@ -80,7 +140,7 @@ def create_assessment(
         assessment = Assessment(
             input_data=data.model_dump(),
             roi_results=roi_results,
-            scoring_engine_version="0.3.0",
+            scoring_engine_version=settings.app_version,
             rankings=[
                 OpportunityRanking(
                     opportunity_name=item["name"],
@@ -115,9 +175,11 @@ def create_assessment(
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except SQLAlchemyError as exc:
         db.rollback()
+        # Raise a custom HTTPException that the error handler can identify as a database error
         raise HTTPException(
             status_code=500,
             detail="Unable to save assessment. Please try again.",
+            headers={"X-Error-Code": "database_error"},
         ) from exc
 
 
@@ -152,7 +214,7 @@ def list_assessments(
 
 @app.get("/api/v1/assessments/{assessment_id}")
 def get_assessment(
-    assessment_id: UUID,
+    assessment_id: uuid.UUID,
     db: Session = Depends(get_db),
 ):
     statement = (

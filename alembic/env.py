@@ -6,16 +6,14 @@ from sqlalchemy import pool
 from alembic import context
 from app.database import Base
 from app import models  # Registers the ORM models with Base.metadata
-import os
-
-from dotenv import load_dotenv
+from app.config import get_settings
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config
-load_dotenv()
 
-database_url = os.getenv("DATABASE_URL")
+settings = get_settings()
+database_url = settings.database_url
 if not database_url:
     raise RuntimeError("DATABASE_URL is not configured")
 
