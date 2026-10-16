@@ -68,6 +68,12 @@ This backlog is ordered by dependency and grouped into phases. Each item is desi
 - Effort: L
 - Frontend change needed afterward: frontend can wire the six-step form to real API calls and save draft progress between steps.
 - Prompt: "Update the assessment API to accept the 6-step wizard payload used by the frontend and add a patch endpoint for saving draft progress. Keep the legacy ROI-only model in a separate `/api/v1/roi/quick` endpoint, not the assessment create route. Guardrails for the agent: Follow `docs/gap-analysis/00-project-context.md`: Supabase only, no Docker, never read or print `.env`, never apply migrations without approval."
+- Completed in this workstream:
+  - Canonical wizard contract matches the frontend strings (`Direct-to-consumer (D2C)`, `Small (1–50)`, `5,000–20,000 / month`, etc.) and the `status` values `Draft` / `In progress` / `Completed` / `Archived`.
+  - `POST`, `PATCH`, `GET /assessments`, and `GET /assessments/{id}` support wizard-backed records while treating `wizard_input IS NULL` rows as legacy records.
+  - `POST /api/v1/assessments` rejects the old ROI-only payload and returns stable field-level 422 errors with the standard request envelope.
+  - `/api/v1/roi/quick` is intentionally deferred while the ROI double-subtraction bug is still owned by BE-07.
+- Deferred: the legacy ROI endpoint is not exposed in this BE-03 scope. The route remains 404 with a TODO marker until the BE-07 bug fix is merged.
 
 ### BE-04 — Persist assessment answers, statuses, and summary data for history screens
 - Goal: Store each assessment’s step answers and summary rows so the history screen can display status, top opportunity, and value potential.

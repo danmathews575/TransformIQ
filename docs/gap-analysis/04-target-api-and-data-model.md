@@ -33,6 +33,23 @@ This section proposes the backend contract the frontend prototype needs, without
 | `/api/v1/settings` | GET/PATCH | MISSING | Needed for settings page. |
 | `/api/v1/me` | GET | MISSING | Needed for user profile and workspace membership. |
 
+## 1.5) Canonical wizard field mappings and status rules
+
+The frontend wizard in `frontend/src/routes/assessments.new.tsx` is the source of truth for the API contract unless there is a strong product reason to diverge. The backend keeps the frontend strings verbatim to avoid UI churn and downstream validation drift.
+
+Canonical mismatches and decisions:
+
+- `model`: keep `"Direct-to-consumer (D2C)"` rather than the shorter `"D2C"` alias. The frontend uses the full label and the production UI already shows this exact string.
+- `size`: keep `"Small (1–50)"`, `"Mid-size (51–200)"`, `"Large (200+)"` using the en dash (`–`) and exact display labels. Do not normalize to `"Small"` or `"Mid-size"` only.
+- `orderVolume`: keep `"Under 1,000 / month"`, `"1,000–5,000 / month"`, `"5,000–20,000 / month"`, `"20,000+ / month"` exactly as the frontend renders them.
+- `revenue`: keep the dollar-band strings with the en dash used in the UI (`"$10M–$25M"`, `"$1M–$10M"`, etc.).
+- `timeline`: keep `"3–6 months"`, `"6–12 months"`, `"12+ months"`, `"Under 3 months"` with the frontend punctuation.
+- `readiness` / `existingAI` / `challenges` / `service`: keep the frontend field names exactly as the contract names (`readiness`, `existingAI`, `challenges`, `service`) and values as rendered by the form.
+- `status`: canonical values are `"Draft"`, `"In progress"`, `"Completed"`, and `"Archived"`. Drafts may be partially valid; completed assessments must validate the full wizard payload.
+- `summary`: summary objects return `id`, `workspace_id`, `name`, `created_at`, `updated_at`, `status`, `source`, `currency`, `opportunity_count`, `estimated_value`, and `top_opportunity_name`.
+
+Legacy rows are still supported by keeping `wizard_input IS NULL` as the marker for historical ROI-only data. The API serializes those rows with a fallback label and `status = "Completed"` in list views, while preserving the legacy `input_data`, `roi_results`, and `scoring_engine_version` columns for detail reads.
+
 ## 2) Pydantic-style request/response objects
 
 ```python
