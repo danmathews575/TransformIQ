@@ -40,6 +40,28 @@ target_metadata = Base.metadata
 # ... etc.
 
 
+def include_object(object, name, type_, reflected, compare_to):
+    """
+    Filter to only include objects in the 'public' schema.
+    Ignores Supabase-managed schemas: auth, storage, extensions, etc.
+    """
+    if type_ == "table":
+        # Only include tables in the public schema
+        if hasattr(object, 'schema') and object.schema and object.schema != "public":
+            return False
+    elif type_ == "column":
+        # Check the table's schema
+        if hasattr(object, 'table') and hasattr(object.table, 'schema') and object.table.schema and object.table.schema != "public":
+            return False
+    elif type_ == "index":
+        if hasattr(object, 'table') and hasattr(object.table, 'schema') and object.table.schema and object.table.schema != "public":
+            return False
+    elif type_ == "foreign_key_constraint":
+        if hasattr(object, 'table') and hasattr(object.table, 'schema') and object.table.schema and object.table.schema != "public":
+            return False
+    return True
+
+
 def run_migrations_offline() -> None:
     """Run migrations in 'offline' mode.
 
@@ -58,6 +80,8 @@ def run_migrations_offline() -> None:
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
+        include_object=include_object,
+        version_table_schema="public",
     )
 
     with context.begin_transaction():
@@ -79,7 +103,10 @@ def run_migrations_online() -> None:
 
     with connectable.connect() as connection:
         context.configure(
-            connection=connection, target_metadata=target_metadata
+            connection=connection,
+            target_metadata=target_metadata,
+            include_object=include_object,
+            version_table_schema="public",
         )
 
         with context.begin_transaction():
