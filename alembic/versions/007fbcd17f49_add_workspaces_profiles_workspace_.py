@@ -41,7 +41,7 @@ def upgrade() -> None:
     # Create profiles table (no FK to auth.users for now)
     op.create_table(
         'profiles',
-        sa.Column('id', postgresql.UUID(as_uuid=True), nullable=False),
+        sa.Column('id', postgresql.UUID(as_uuid=True), server_default=sa.text('gen_random_uuid()'), nullable=False),
         sa.Column('full_name', sa.Text(), nullable=True),
         sa.Column('role', sa.Text(), nullable=False, server_default='admin'),
         sa.Column('created_at', sa.DateTime(timezone=True), nullable=False, server_default=sa.text('NOW()')),

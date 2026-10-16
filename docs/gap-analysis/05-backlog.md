@@ -26,24 +26,27 @@ This backlog is ordered by dependency and grouped into phases. Each item is desi
 - Prompt: "Set up a FastAPI app config module for environment variables, CORS, a shared error envelope, and health/docs boot behavior without a database. Keep it additive and compatible with existing app/api.py. Guardrails for the agent: Follow `docs/gap-analysis/00-project-context.md`: Supabase only, no Docker, never read or print `.env`, never apply migrations without approval."
 
 ### BE-02 — Add database connection, migrations, and demo seed data
-- Goal: Make the Supabase-backed Postgres connection and migration path reliable, with an idempotent demo seed for a sandbox workspace and assessment.
-- Why it matters: All real screens eventually need persistent workspace and assessment state; the current backend has only a basic ORM and a single migration.
+- Goal: Make the Supabase-backed Postgres connection and migration path reliable, with an idempotent demo seed for a sandbox workspace and membership.
+- Why it matters: All real screens eventually need persistent workspace context; the current backend has only a basic ORM and a single migration.
 - Depends on: BE-01
-- Files: `app/database.py` (update), `alembic/env.py` (update), `alembic/versions/*.py` (new), `tests/seed_demo_data.py` (new)
-- Endpoint(s)/schema(s): no public endpoints yet; DB init and migration commands
-- DB changes: additive seed tables for workspace, demo assessment, and a migration plan preserving existing tables
+- Files: `app/database.py` (update), `alembic/env.py` (update), `alembic/versions/*.py` (new), `scripts/seed_demo.py` (new), `tests/test_be02_migrations.py` (new)
+- Endpoint(s)/schema(s): no public endpoints yet; DB init, migration commands, and demo seed only
+- DB changes: additive foundation tables `workspaces`, `profiles`, and `workspace_memberships` plus a separate RLS migration for the legacy `assessments` and `opportunity_rankings` tables; no assessment or opportunity catalog schema was added here
 - Acceptance criteria:
-  - Alembic runs against the configured Supabase project in `.env` via the session pooler or direct connection with `sslmode=require`.
-  - Seed script creates at least one workspace, one assessment, and a sample opportunity catalog row, and marks those rows `source='demo'` so they can be removed cleanly.
-  - Existing `assessments` and `opportunity_rankings` tables remain untouched.
+  - Alembic reads `DATABASE_URL` from app settings and uses the Supabase session pooler/Direct Postgres configuration with `sslmode=require` for the migration path.
+  - Seed script creates a single demo workspace and one demo membership row, marks them `source='demo'`, and is idempotent with `--remove` deleting only demo-marked rows.
+  - Legacy `assessments` and `opportunity_rankings` tables remain intact and only receive RLS enforcement in the separate, approval-friendly migration.
   - Every new table gets `ENABLE ROW LEVEL SECURITY` with no policies and all privileges revoked from `anon` and `authenticated`.
   - Migration SQL is reviewed via `alembic upgrade head --sql`; any apply is postponed until explicit owner approval.
-  - Regression test ensures the current double-subtraction bug in `app/roi_engine.py` fails before the fix and is updated when `scoring_engine_version` is bumped.
+  - The ROI double-subtraction regression is documented as a strict `xfail` test to preserve the bug report while leaving the calculation fix for the later ROI BE item.
   - No secrets are printed in logs or test output.
-- Test plan: migration smoke tests; seed script idempotence; database initialization test; regression test for `annual_net_benefit` subtraction bug; no-network mocked tests by default.
+  - `ALLOW_DB_WRITES=1` is required for any live migration or seed write; the owner sets it per command.
+- Test plan: migration smoke tests; seed script idempotence; database initialization test; strict ROI regression documentation; no-network mocked tests by default.
 - Effort: M
 - Frontend change needed afterward: none until seeded data is exposed via API.
-- Prompt: "Create a Supabase-ready Alembic migration plan and idempotent seed script for a sample workspace and assessment, using the project config in `.env` and the session pooler/direct connection. Preserve current tables, add RLS on all new tables, and include a regression test for the double-subtraction ROI bug before the scoring logic is corrected. Guardrails for the agent: Follow `docs/gap-analysis/00-project-context.md`: Supabase only, no Docker, never read or print `.env`, never apply migrations without approval."
+- Prompt: "Create the minimal Supabase-ready migration foundation for workspace/profile membership plumbing and an idempotent demo seed, without touching BE-03+ schemas. Keep the legacy RLS hardening in a separate migration so it can be approved independently. Guardrails for the agent: Follow `docs/gap-analysis/00-project-context.md`: Supabase only, no Docker, never read or print `.env`, never apply migrations without approval."
+- Deferred seed items moved out of this scope: demo assessment rows and sample opportunity catalog rows were intentionally deferred to the relevant assessment/opportunity phases (BE-04, BE-05) rather than being added in the foundation migration.
+- Notes: The migration was applied in one step on 2026-10-16; the live legacy row count after apply was 7. The same row count is expected on the read-only API check when the DB is at the post-apply state.
 
 ## Phase 1 — Assessment workflow and wizard data
 

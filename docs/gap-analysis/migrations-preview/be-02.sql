@@ -50,7 +50,7 @@ ALTER TABLE public."workspaces" ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON TABLE public."workspaces" FROM anon, authenticated;
 
 CREATE TABLE public.profiles (
-    id UUID NOT NULL, 
+    id UUID DEFAULT gen_random_uuid() NOT NULL, 
     full_name TEXT, 
     role TEXT DEFAULT 'admin' NOT NULL, 
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL, 

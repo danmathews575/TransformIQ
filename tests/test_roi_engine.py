@@ -44,7 +44,10 @@ def test_invalid_automation_rate_is_rejected():
         )
 
 
-@pytest.mark.xfail(reason="Double-subtraction bug: annual_net_benefit incorrectly subtracts implementation_cost")
+@pytest.mark.xfail(
+    reason="Double-subtraction bug: annual_net_benefit incorrectly subtracts implementation_cost",
+    strict=True,
+)
 def test_annual_net_benefit_excludes_implementation_cost():
     """
     Regression test for double-subtraction bug in annual_net_benefit.

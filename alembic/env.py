@@ -1,3 +1,4 @@
+import os
 from logging.config import fileConfig
 
 from sqlalchemy import engine_from_config
@@ -13,9 +14,14 @@ from app.config import get_settings
 config = context.config
 
 settings = get_settings()
+if not context.is_offline_mode() and os.getenv("ALLOW_DB_WRITES") != "1":
+    raise RuntimeError(
+        "Online Alembic writes are disabled. Set ALLOW_DB_WRITES=1 to run migrations."
+    )
+
 database_url = settings.database_url
 if not database_url:
-    raise RuntimeError("DATABASE_URL is not configured")
+    raise RuntimeError("No database URL is configured for Alembic.")
 
 config.set_main_option(
     "sqlalchemy.url",

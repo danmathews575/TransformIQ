@@ -8,8 +8,14 @@ Usage:
 """
 
 import argparse
+import os
 import sys
 import uuid
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -27,65 +33,92 @@ DEMO_SOURCE = "demo"
 
 def seed_demo_data(db: Session) -> None:
     """Insert demo workspace, profile, and membership (idempotent)."""
-    # Upsert workspace
-    workspace_stmt = pg_insert(
-        "workspaces"
-    ).values(
-        name=DEMO_WORKSPACE_NAME,
-        slug=DEMO_WORKSPACE_SLUG,
-        industry="E-commerce",
-        country_code="US",
-        default_currency="USD",
-        source=DEMO_SOURCE,
-    ).on_conflict_do_update(
-        index_elements=["slug"],
-        set_={
-            "name": DEMO_WORKSPACE_NAME,
-            "industry": "E-commerce",
-            "country_code": "US",
-            "default_currency": "USD",
-            "source": DEMO_SOURCE,
-        }
-    ).returning("workspaces.id")
-
-    result = db.execute(workspace_stmt)
-    workspace_id = result.scalar_one()
-
-    # Upsert profile
-    profile_stmt = pg_insert(
-        "profiles"
-    ).values(
-        id=DEMO_PROFILE_ID,
-        full_name="Demo User",
-        role="admin",
-        source=DEMO_SOURCE,
-    ).on_conflict_do_update(
-        index_elements=["id"],
-        set_={
-            "full_name": "Demo User",
-            "role": "admin",
-            "source": DEMO_SOURCE,
-        }
+    workspaces_table = sa.table(
+        "workspaces",
+        sa.column("id", sa.Uuid),
+        sa.column("name", sa.Text),
+        sa.column("slug", sa.Text),
+        sa.column("industry", sa.Text),
+        sa.column("country_code", sa.Text),
+        sa.column("default_currency", sa.Text),
+        sa.column("source", sa.Text),
+    )
+    profiles_table = sa.table(
+        "profiles",
+        sa.column("id", sa.Uuid),
+        sa.column("full_name", sa.Text),
+        sa.column("role", sa.Text),
+        sa.column("source", sa.Text),
+    )
+    memberships_table = sa.table(
+        "workspace_memberships",
+        sa.column("id", sa.Uuid),
+        sa.column("workspace_id", sa.Uuid),
+        sa.column("profile_id", sa.Uuid),
+        sa.column("role", sa.Text),
+        sa.column("source", sa.Text),
     )
 
+    workspace_stmt = (
+        pg_insert(workspaces_table)
+        .values(
+            name=DEMO_WORKSPACE_NAME,
+            slug=DEMO_WORKSPACE_SLUG,
+            industry="E-commerce",
+            country_code="US",
+            default_currency="USD",
+            source=DEMO_SOURCE,
+        )
+        .on_conflict_do_update(
+            index_elements=["slug"],
+            set_={
+                "name": DEMO_WORKSPACE_NAME,
+                "industry": "E-commerce",
+                "country_code": "US",
+                "default_currency": "USD",
+                "source": DEMO_SOURCE,
+            },
+        )
+        .returning(workspaces_table.c.id)
+    )
+    workspace_result = db.execute(workspace_stmt)
+    workspace_id = workspace_result.scalar_one()
+
+    profile_stmt = (
+        pg_insert(profiles_table)
+        .values(
+            id=DEMO_PROFILE_ID,
+            full_name="Demo User",
+            role="admin",
+            source=DEMO_SOURCE,
+        )
+        .on_conflict_do_update(
+            index_elements=["id"],
+            set_={
+                "full_name": "Demo User",
+                "role": "admin",
+                "source": DEMO_SOURCE,
+            },
+        )
+    )
     db.execute(profile_stmt)
 
-    # Upsert workspace membership
-    membership_stmt = pg_insert(
-        "workspace_memberships"
-    ).values(
-        workspace_id=workspace_id,
-        profile_id=DEMO_PROFILE_ID,
-        role="admin",
-        source=DEMO_SOURCE,
-    ).on_conflict_do_update(
-        index_elements=["workspace_id", "profile_id"],
-        set_={
-            "role": "admin",
-            "source": DEMO_SOURCE,
-        }
+    membership_stmt = (
+        pg_insert(memberships_table)
+        .values(
+            workspace_id=workspace_id,
+            profile_id=DEMO_PROFILE_ID,
+            role="admin",
+            source=DEMO_SOURCE,
+        )
+        .on_conflict_do_update(
+            index_elements=["workspace_id", "profile_id"],
+            set_={
+                "role": "admin",
+                "source": DEMO_SOURCE,
+            },
+        )
     )
-
     db.execute(membership_stmt)
     db.commit()
     print(f"Demo data seeded: workspace '{DEMO_WORKSPACE_SLUG}' (id: {workspace_id})")
@@ -127,6 +160,10 @@ def main() -> int:
 
     if not args.confirm:
         print("Error: --confirm is required", file=sys.stderr)
+        return 1
+
+    if os.getenv("ALLOW_DB_WRITES") != "1":
+        print("Error: ALLOW_DB_WRITES=1 is required to write to the live database.", file=sys.stderr)
         return 1
 
     settings = get_settings()

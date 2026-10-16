@@ -1,11 +1,18 @@
 """Tests for BE-02: migration plumbing, RLS helper, seed logic."""
 
-import pytest
-from alembic.script import ScriptDirectory
-from alembic.config import Config
+import os
+import subprocess
+import sys
+from pathlib import Path
 from unittest.mock import MagicMock
 
-from app.migrations.rls import enable_rls, disable_rls
+import pytest
+from alembic.config import Config
+from alembic.script import ScriptDirectory
+
+from app.migrations.rls import disable_rls, enable_rls
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
 class TestAlembicMigrationChain:
@@ -152,31 +159,81 @@ class TestSeedScriptArgs:
 
     def test_requires_confirm_flag(self):
         """Script should require --confirm flag."""
-        import subprocess
-        import sys
-        
+        env = {
+            **os.environ,
+            "DATABASE_URL": "postgresql://user:pass@localhost:5432/db?sslmode=require",
+        }
+        env.pop("ALLOW_DB_WRITES", None)
+
         result = subprocess.run(
             [sys.executable, "scripts/seed_demo.py"],
             capture_output=True,
             text=True,
-            cwd="/home/danmathewsvinu/TransformIQ.worktrees/chorereplace-old-frontend-with-lovable"
+            cwd=str(REPO_ROOT),
+            env=env,
         )
-        
+
         assert result.returncode != 0
         assert "confirm" in result.stderr.lower() or "confirm" in result.stdout.lower()
 
+    def test_seed_demo_requires_allow_db_writes(self):
+        """Seed script should refuse live writes unless ALLOW_DB_WRITES=1 is set."""
+        env = {
+            **os.environ,
+            "DATABASE_URL": "postgresql://user:pass@localhost:5432/db?sslmode=require",
+        }
+        env.pop("ALLOW_DB_WRITES", None)
+
+        result = subprocess.run(
+            [sys.executable, "scripts/seed_demo.py", "--confirm"],
+            capture_output=True,
+            text=True,
+            cwd=str(REPO_ROOT),
+            env=env,
+        )
+
+        assert result.returncode != 0
+        combined = (result.stderr + result.stdout).lower()
+        assert "allow_db_writes" in combined
+        assert "postgresql://" not in combined
+
     def test_help_shows_options(self):
         """Script should show help with --help."""
-        import subprocess
-        import sys
-        
+        env = {
+            **os.environ,
+            "DATABASE_URL": "postgresql://user:pass@localhost:5432/db?sslmode=require",
+        }
+        env.pop("ALLOW_DB_WRITES", None)
+
         result = subprocess.run(
             [sys.executable, "scripts/seed_demo.py", "--help"],
             capture_output=True,
             text=True,
-            cwd="/home/danmathewsvinu/TransformIQ.worktrees/chorereplace-old-frontend-with-lovable"
+            cwd=str(REPO_ROOT),
+            env=env,
         )
-        
+
         assert result.returncode == 0
         assert "--confirm" in result.stdout
         assert "--remove" in result.stdout
+
+    def test_alembic_online_requires_allow_db_writes(self):
+        """Alembic online writes should refuse without ALLOW_DB_WRITES=1."""
+        env = {
+            **os.environ,
+            "DATABASE_URL": "postgresql://user:pass@localhost:5432/db?sslmode=require",
+        }
+        env.pop("ALLOW_DB_WRITES", None)
+
+        result = subprocess.run(
+            ["alembic", "upgrade", "head"],
+            capture_output=True,
+            text=True,
+            cwd=str(REPO_ROOT),
+            env=env,
+        )
+
+        assert result.returncode != 0
+        combined = (result.stderr + result.stdout).lower()
+        assert "allow_db_writes" in combined
+        assert "postgresql://" not in combined
